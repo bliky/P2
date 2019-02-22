@@ -64,7 +64,7 @@ movie_data
 # 
 # 
 
-# In[17]:
+# In[2]:
 
 
 print('rows: {}, columns: {}'.format(*movie_data.shape))
@@ -88,7 +88,7 @@ movie_data.describe()
 # 
 # 任务：使用适当的方法来清理空值，并将得到的数据保存。
 
-# In[18]:
+# In[3]:
 
 
 # print(movie_data.dropna(axis=0, inplace=True))
@@ -118,7 +118,7 @@ movie_data.isnull().any()
 # 
 # 要求：每一个语句只能用一行代码实现。
 
-# In[34]:
+# In[4]:
 
 
 # movie_data[['id', 'popularity', 'budget', 'runtime', 'vote_average']]
@@ -139,7 +139,7 @@ movie_data.loc[49:59][['popularity']]
 # 
 # 要求：请使用 Logical Indexing实现。
 
-# In[35]:
+# In[5]:
 
 
 movie_data[movie_data['popularity'] > 5]
@@ -155,7 +155,7 @@ movie_data[(movie_data['popularity'] > 5) & (movie_data['release_year'] > 1996)]
 # 
 # 要求：使用 `Groupby` 命令实现。
 
-# In[51]:
+# In[6]:
 
 
 movie_data.groupby(['release_year']).revenue.agg('mean')
@@ -181,7 +181,7 @@ movie_data.groupby(['director']).agg({'popularity': 'mean'}).sort_values(by="pop
 
 # **任务3.1：**对 `popularity` 最高的20名电影绘制其 `popularity` 值。
 
-# In[55]:
+# In[7]:
 
 
 # movie_data[['id', 'popularity']].head(100)
@@ -200,10 +200,10 @@ plt.title('popularity top 20')
 # ---
 # **任务3.2：**分析电影净利润（票房-成本）随着年份变化的情况，并简单进行分析。
 
-# In[103]:
+# In[24]:
 
 
-profit_by_year = movie_data.groupby(['release_year']).agg({'budget': 'sum', 'revenue': 'sum'}).sort_values('release_year')
+# profit_by_year = movie_data.groupby(['release_year']).agg({'budget': 'sum', 'revenue': 'sum'}).sort_values('release_year')
 
 # plt.plot(year_sorted_movie_data['release_year'], year_sorted_movie_data['revenue']  - year_sorted_movie_data['budget'])
 # print(profit_by_year.head(1))
@@ -213,27 +213,53 @@ profit_by_year = movie_data.groupby(['release_year']).agg({'budget': 'sum', 'rev
 # plt.errorbar(profit_by_year.index, profit_by_year['budget'])
 # plt.errorbar(profit_by_year.index, profit_by_year['revenue'], yerr=profit_by_year['revenue']-profit_by_year['budget'], fmt='-o')
 
-plt.plot(profit_by_year['revenue']-profit_by_year['budget'])
+# plt.plot(profit_by_year['revenue']-profit_by_year['budget'])
+
+movie_data['profits'] = movie_data['revenue_adj'] - movie_data['budget_adj']
+profits_by_year = movie_data.groupby('release_year')['profits'].mean()
+
+plt.subplot(1, 2, 1)
+plt.errorbar(x=profits_by_year.index, y=movie_data.groupby('release_year')['budget_adj'].sum())
+plt.errorbar(x=profits_by_year.index, y=movie_data.groupby('release_year')['revenue_adj'].sum())
+plt.xlabel('release_year')
+plt.ylabel('sum of budget & revenue')
+
+plt.subplot(1, 2, 2)
+plt.errorbar(x=profits_by_year.index, y=profits_by_year)
+plt.xlabel('release_year')
+plt.ylabel('mean of profits')
 
 
 # ---
 # 
 # **[选做]任务3.3：**选择最多产的10位导演（电影数量最多的），绘制他们排行前3的三部电影的票房情况，并简要进行分析。
 
-# In[140]:
+# In[25]:
 
 
-directors = movie_data[movie_data['director'] != 0].groupby(['director']).agg({'original_title': 'count'}).sort_values('original_title', ascending=False).index[0:10]
+# directors = movie_data[movie_data['director'] != 0].groupby(['director']).agg({'original_title': 'count'}).sort_values('original_title', ascending=False).index[0:10]
 
-for director in directors:
-    print(movie_data[movie_data['director'] == director].sort_values('revenue', ascending=False)[0:3][['director', 'original_title', 'revenue']])
+# for director in directors:
+    #print(movie_data[movie_data['director'] == director].sort_values('revenue', ascending=False)[0:3][['director', 'original_title', 'revenue']])
+
+director_data = movie_data[['director', 'original_title', 'revenue']]
+# Get Most Prolific Directors 
+top10_directors = director_data.groupby('director').count()['original_title'].nlargest(10).index
+top10_table = director_data[director_data['director'].isin(top10_directors)]
+# Rearrange Table for Plotting
+top10_table = top10_table.sort_values(['director','revenue'], ascending=[False,False])   .set_index(['director','original_title']) 
+# Plot Highest Revenues
+top10_table.groupby(level=0).head(3).unstack()   .plot(kind='bar',stacked=True, legend=False, rot=30, figsize=(10,5))
+plt.ylabel('revenue')
+plt.title("Top 10 prolific directors with 3 movies of highest revenues")
+    
 
 
 # ---
 # 
 # **[选做]任务3.4：**分析1968年~2015年六月电影的数量的变化。
 
-# In[150]:
+# In[27]:
 
 
 films_by_year = movie_data[(movie_data['release_year'] > 1967) & (movie_data['release_year'] < 2016)]
@@ -244,12 +270,13 @@ plt.plot(films_by_year.groupby('release_year').agg({'original_title': 'count'}).
 # 
 # **[选做]任务3.5：**分析1968年~2015年六月电影 `Comedy` 和 `Drama` 两类电影的数量的变化。
 
-# In[156]:
+# In[36]:
 
 
-c_d_films = films_by_year[(films_by_year['genres'] == 'Comedy') | (films_by_year['genres'] == 'Drama')]
+c_d_films = films_by_year[(films_by_year['genres'].str.contains('Comedy')) | (films_by_year['genres'].str.contains('Drama'))]
 
-c_d_films.groupby(['release_year', 'genres']).agg({'original_title': 'count'}).sort_values('release_year')
+# c_d_films.groupby(['release_year', 'genres']).agg({'original_title': 'count'}).sort_values('release_year')
+c_d_films.groupby(['release_year', 'genres']).count()['original_title']
 
 
 # > 注意: 当你写完了所有的代码，并且回答了所有的问题。你就可以把你的 iPython Notebook 导出成 HTML 文件。你可以在菜单栏，这样导出**File -> Download as -> HTML (.html)、Python (.py)** 把导出的 HTML、python文件 和这个 iPython notebook 一起提交给审阅者。
